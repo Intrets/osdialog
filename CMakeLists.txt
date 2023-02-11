@@ -23,7 +23,7 @@ else()
 endif()
 
 if (${OSDIALOG_PLATFORM} STREQUAL windows)
-	add_library(${MODULE_NAME} osdialog.h osdialog.c osdialog_win.c)
+	add_library(${MODULE_NAME} osdialog.h osdialog.c osdialog_win.h osdialog_win.c)
 elseif (${OSDIALOG_PLATFORM} STREQUAL mac)
 	add_library(${MODULE_NAME} osdialog.h osdialog.c osdialog_mac.G)
 elseif (${OSDIALOG_PLATFORM} STREQUAL gtk)
