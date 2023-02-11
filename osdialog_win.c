@@ -19,6 +19,10 @@ static char* wchar_to_utf8(const wchar_t* s) {
 	return r;
 }
 
+char* osdialog_win_wchar_to_utf8(wchar_t const* s) {
+	return wchar_to_utf8(s);
+}
+
 static wchar_t* utf8_to_wchar(const char* s) {
 	if (!s)
 		return NULL;
