@@ -235,21 +235,78 @@ static INT CALLBACK browseCallbackProc(HWND hWnd, UINT message, WPARAM wParam, L
 	return 0;
 }
 
-static void write_format_to_buffer(char** buffer, int* buffer_size, char const* fmt, ...) {
+struct string_buffer
+{
+	int size;
+	char* data;
+};
+
+static void write_format_to_buffer2(struct string_buffer* buffer, int* pos, char const* fmt, ...) {
+	if (buffer->data == NULL) {
+		return;
+	}
+
 	va_list args;
 	va_start(args, fmt);
-	int written = min(*buffer_size, vsnprintf(*buffer, *buffer_size, fmt, args));
-	*buffer += written;
-	*buffer_size -= written;
+	int remaining = buffer->size - *pos;
+	int written = vsnprintf(buffer->data + *pos, buffer->size - *pos, fmt, args);
+
+	if (written > remaining) {
+		int over = written - remaining;
+
+		int newSize = max(64, max(buffer->size + over, buffer->size * 2));
+		char* newBuffer = OSDIALOG_MALLOC(newSize);
+
+		if (newBuffer == NULL) {
+			return;
+		}
+
+		memcpy(newBuffer, buffer->data, buffer->size);
+
+		OSDIALOG_FREE(buffer->data);
+		buffer->data = newBuffer;
+		buffer->size = newSize;
+
+		remaining = buffer->size - *pos;
+		written = vsnprintf(buffer->data + *pos, remaining, fmt, args);
+
+		if (written > remaining) {
+			abort();
+		}
+	}
+
+	*pos += written;
 	va_end(args);
 }
 
-static void write_null_to_buffer(char** buffer, int* buffer_size) {
-	if (buffer_size > 0) {
-		**buffer = '\0';
-		(*buffer)++;
-		(*buffer_size)--;
+static void write_null_to_buffer2(struct string_buffer* buffer, int* pos) {
+	if (buffer->data == NULL) {
+		return;
 	}
+
+	int remaining = buffer->size - *pos;
+
+	if (remaining < 0) {
+		abort();
+	}
+
+	if (remaining == 0) {
+		int newSize = max(64, buffer->size * 2);
+		char* newBuffer = OSDIALOG_MALLOC(newSize);
+
+		if (newBuffer == NULL) {
+			return;
+		}
+
+		memcpy(newBuffer, buffer->data, buffer->size);
+		OSDIALOG_FREE(buffer->data);
+
+		buffer->data = newBuffer;
+		buffer->size = newSize;
+	}
+
+	*(buffer->data + *pos) = '\0';
+	(*pos)++;
 }
 
 char* osdialog_file(osdialog_file_action action, char const* dir, char const* filename, osdialog_filters* filters) {
@@ -310,34 +367,37 @@ char* osdialog_file(osdialog_file_action action, char const* dir, char const* fi
 		// filters
 		wchar_t* strFilter = NULL;
 		if (filters) {
-			char fBuf[4096];
-			int fRem = sizeof(fBuf) - 1;
-			char* buf = fBuf;
+			struct string_buffer buffer;
+			buffer.data = OSDIALOG_MALLOC(1024);
+			buffer.size = 1024;
+			int pos = 0;
 
 			for (; filters; filters = filters->next) {
-				write_format_to_buffer(&buf, &fRem, "%s", filters->name);
-				write_null_to_buffer(&buf, &fRem);
+				write_format_to_buffer2(&buffer, &pos, "%s", filters->name);
+				write_null_to_buffer2(&buffer, &pos);
 
 				for (osdialog_filter_patterns* patterns = filters->patterns; patterns; patterns = patterns->next) {
-					write_format_to_buffer(&buf, &fRem, "*.%s", patterns->pattern);
+					write_format_to_buffer2(&buffer, &pos, "*.%s", patterns->pattern);
 
 					if (patterns->next) {
-						write_format_to_buffer(&buf, &fRem, ";");
+						write_format_to_buffer2(&buffer, &pos, ";");
 					}
 				}
 
-				write_null_to_buffer(&buf, &fRem);
+				write_null_to_buffer2(&buffer, &pos);
 			}
 
-			fRem++;
-			write_null_to_buffer(&buf, &fRem);
-
-			int fLen = sizeof(fBuf) - fRem;
+			write_null_to_buffer2(&buffer, &pos);
 			// Don't use utf8_to_wchar() because this is not a NULL-terminated string.
-			strFilter = OSDIALOG_MALLOC(fLen * sizeof(wchar_t));
-			MultiByteToWideChar(CP_UTF8, 0, fBuf, fLen, strFilter, fLen);
+			strFilter = OSDIALOG_MALLOC(buffer.size * sizeof(wchar_t));
+			if (buffer.data == 0) {
+				abort();
+			}
+			MultiByteToWideChar(CP_UTF8, 0, buffer.data, buffer.size, strFilter, buffer.size);
 			ofn.lpstrFilter = strFilter;
 			ofn.nFilterIndex = 1;
+
+			OSDIALOG_FREE(buffer.data);
 		}
 
 		BOOL success;

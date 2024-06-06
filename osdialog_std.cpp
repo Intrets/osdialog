@@ -27,7 +27,7 @@ namespace osdialog
 		std::stringstream filterStream{};
 
 		for (auto& filter : filterTypes) {
-			filterStream << filter.display << " (*." << filter.extension << "):" << filter.extension << "; ";
+			filterStream << filter.display << " (*." << filter.extension << "):" << filter.extension << ";";
 		}
 		filterStream << "All Files (*.*):*";
 
