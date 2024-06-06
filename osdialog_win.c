@@ -235,7 +235,24 @@ static INT CALLBACK browseCallbackProc(HWND hWnd, UINT message, WPARAM wParam, L
 	return 0;
 }
 
-char* osdialog_file(osdialog_file_action action, const char* dir, const char* filename, osdialog_filters* filters) {
+static void write_format_to_buffer(char** buffer, int* buffer_size, char const* fmt, ...) {
+	va_list args;
+	va_start(args, fmt);
+	int written = min(*buffer_size, vsnprintf(*buffer, *buffer_size, fmt, args));
+	*buffer += written;
+	*buffer_size -= written;
+	va_end(args);
+}
+
+static void write_null_to_buffer(char** buffer, int* buffer_size) {
+	if (buffer_size > 0) {
+		**buffer = '\0';
+		(*buffer)++;
+		(*buffer_size)--;
+	}
+}
+
+char* osdialog_file(osdialog_file_action action, char const* dir, char const* filename, osdialog_filters* filters) {
 	if (action == OSDIALOG_OPEN_DIR) {
 		// open directory dialog
 		BROWSEINFOW bInfo;
@@ -294,20 +311,28 @@ char* osdialog_file(osdialog_file_action action, const char* dir, const char* fi
 		wchar_t* strFilter = NULL;
 		if (filters) {
 			char fBuf[4096];
-			int fLen = 0;
+			int fRem = sizeof(fBuf) - 1;
+			char* buf = fBuf;
 
 			for (; filters; filters = filters->next) {
-				fLen += snprintf(fBuf + fLen, sizeof(fBuf) - fLen, "%s", filters->name);
-				fBuf[fLen++] = '\0';
-				for (osdialog_filter_patterns* patterns = filters->patterns; patterns; patterns = patterns->next) {
-					fLen += snprintf(fBuf + fLen, sizeof(fBuf) - fLen, "*.%s", patterns->pattern);
-					if (patterns->next)
-						fLen += snprintf(fBuf + fLen, sizeof(fBuf) - fLen, ";");
-				}
-				fBuf[fLen++] = '\0';
-			}
-			fBuf[fLen++] = '\0';
+				write_format_to_buffer(&buf, &fRem, "%s", filters->name);
+				write_null_to_buffer(&buf, &fRem);
 
+				for (osdialog_filter_patterns* patterns = filters->patterns; patterns; patterns = patterns->next) {
+					write_format_to_buffer(&buf, &fRem, "*.%s", patterns->pattern);
+
+					if (patterns->next) {
+						write_format_to_buffer(&buf, &fRem, ";");
+					}
+				}
+
+				write_null_to_buffer(&buf, &fRem);
+			}
+
+			fRem++;
+			write_null_to_buffer(&buf, &fRem);
+
+			int fLen = sizeof(fBuf) - fRem;
 			// Don't use utf8_to_wchar() because this is not a NULL-terminated string.
 			strFilter = OSDIALOG_MALLOC(fLen * sizeof(wchar_t));
 			MultiByteToWideChar(CP_UTF8, 0, fBuf, fLen, strFilter, fLen);
