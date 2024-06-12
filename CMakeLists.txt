@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 2.18)
 
 set(MODULE_NAME osdialog)
 
@@ -12,7 +12,7 @@ else()
 	if(${CMAKE_CXX_COMPILER_ID} STREQUAL MSVC)
 		set(OSDIALOG_PLATFORM windows)
 	elseif(${CMAKE_CXX_COMPILER_ID} STREQUAL Clang)
-		if(${CMAKE_CXX_SIMULATE_ID} STREQUAL MSVC)
+		if(${CMAKE_CXX_SIMULATE_ID} AND ${CMAKE_CXX_SIMULATE_ID} STREQUAL MSVC)
 			set(OSDIALOG_PLATFORM windows)
 		else()
 			set(OSDIALOG_PLATFORM gtk)
