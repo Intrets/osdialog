@@ -2,13 +2,19 @@
 
 #include "osdialog_win.h"
 
+#include <sstream>
+
 namespace osdialog
 {
 	std::string pathToString(std::filesystem::path path) {
+#ifdef WIN32
 		auto u8Path = osdialog_win_wchar_to_utf8(path.c_str());
 		std::string result = u8Path;
 		OSDIALOG_FREE(u8Path);
 		return result;
+#else
+		return path.string();
+#endif
 	}
 
 	std::optional<std::filesystem::path> file(
