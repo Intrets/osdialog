@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.18)
+cmake_minimum_required(VERSION 3.18)
 
 set(MODULE_NAME osdialog)
 
