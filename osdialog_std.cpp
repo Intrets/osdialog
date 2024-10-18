@@ -4,6 +4,13 @@
 
 #include <sstream>
 
+#ifdef OS_WIN
+#include <ShObjIdl.h>
+#include <Windows.h>
+#endif
+
+#include <tepp/defer.h>
+
 namespace osdialog
 {
 	std::string pathToString(std::filesystem::path path) {
@@ -87,4 +94,79 @@ namespace osdialog
 		    filters
 		);
 	}
+
+#define TRY_OPT(X) \
+	if (!(SUCCEEDED(X))) { \
+		return std::nullopt; \
+	}
+
+	std::optional<std::filesystem::path> openDir(
+	    std::filesystem::path const& folder
+	) {
+#ifdef OS_WIN
+		HRESULT hr = CoInitializeEx(NULL, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
+		auto uninitialize = te::defer([] {
+			CoUninitialize();
+		});
+		TRY_OPT(hr);
+
+		IFileDialog* pFileDialog = NULL;
+		auto releaseDialog = te::defer([&] {
+			if (pFileDialog != NULL) {
+				pFileDialog->Release();
+			}
+		});
+		hr = CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&pFileDialog));
+		TRY_OPT(hr);
+
+		DWORD dwOptions;
+		pFileDialog->GetOptions(&dwOptions);
+		pFileDialog->SetOptions(dwOptions | FOS_PICKFOLDERS);
+
+		auto currentString = folder.wstring();
+		IShellItem* pFolderItem = NULL;
+		auto releaseFolder = te::defer([&] {
+			if (pFolderItem != NULL) {
+				pFolderItem->Release();
+			}
+		});
+		hr = SHCreateItemFromParsingName(currentString.c_str(), NULL, IID_PPV_ARGS(&pFolderItem));
+		if (SUCCEEDED(hr) && pFolderItem != NULL) {
+			pFileDialog->SetFolder(pFolderItem);
+		}
+
+		hr = pFileDialog->Show(NULL);
+		TRY_OPT(hr);
+
+		IShellItem* pItem = NULL;
+		auto releaseItem = te::defer([&] {
+			if (pItem != NULL) {
+				pItem->Release();
+			}
+		});
+		hr = pFileDialog->GetResult(&pItem);
+		TRY_OPT(hr);
+
+		PWSTR pszFilePath = NULL;
+		auto freeString = te::defer([&] {
+			if (pszFilePath != NULL) {
+				CoTaskMemFree(pszFilePath);
+			}
+		});
+		hr = pItem->GetDisplayName(SIGDN_FILESYSPATH, &pszFilePath);
+		TRY_OPT(hr);
+
+		return std::filesystem::path(pszFilePath);
+
+#else
+		return osdialog::file(
+		    osdialog_file_action::OSDIALOG_OPEN_DIR,
+		    folder,
+		    {},
+		    {},
+		    {}
+		);
+#endif
+	}
+#undef TRY_OPT
 }

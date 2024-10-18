@@ -42,6 +42,7 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Android")
 
 	target_include_directories(${MODULE_NAME} PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 	target_compile_definitions(${MODULE_NAME} PUBLIC LIB_OSDIALOG)
+	target_link_libraries(${MODULE_NAME} PUBLIC tepp)
 else()
 	set(OSDIALOG_FOUND OFF CACHE INTERNAL "")
 endif()

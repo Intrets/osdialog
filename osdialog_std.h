@@ -31,4 +31,8 @@ namespace osdialog
 	    std::optional<std::filesystem::path> const& file,
 	    std::initializer_list<filter_file_type> filters
 	);
+
+	std::optional<std::filesystem::path> openDir(
+	    std::filesystem::path const& folder
+	);
 }
